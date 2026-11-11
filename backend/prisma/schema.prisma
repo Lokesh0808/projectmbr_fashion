@@ -1,0 +1,314 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  isAdmin   Boolean  @default(false)
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cart     Cart?
+  wishlist Wishlist?
+  orders   Order[]
+
+  @@map("user")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  price       Float
+  mrp         Float?
+  offerPrice  Float?
+  images      Json // Array of image filenames
+  category    String
+  sizes       Json // Array of available sizes
+  stock       Int      @default(0)
+  isTrending  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  variants       ProductVariant[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
+  wishlistItems  WishlistItem[]
+  storeInventory StoreInventory[]
+
+  @@map("product")
+}
+
+model ProductVariant {
+  id         String   @id @default(cuid())
+  productId  String
+  colorName  String
+  colorCode  String?
+  images     Json
+  price      Float
+  mrp        Float?
+  offerPrice Float?
+  sizes      Json
+  sizeStocks Json?
+  stock      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
+
+  @@index([productId])
+  @@map("productvariant")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  label     String
+  value     String   @unique
+  image     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("category")
+}
+
+model Banner {
+  id        String   @id @default(cuid())
+  title     String?
+  subtitle  String?
+  image     String   @db.Text
+  link      String?  @db.Text
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("banner")
+}
+
+model Coupon {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  discountType   String   @default("percentage")
+  discountValue  Float
+  minOrderAmount Float?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("coupon")
+}
+
+model CouponRedemption {
+  id         String   @id @default(cuid())
+  couponId   String
+  couponCode String
+  userId     String
+  orderId    String
+  createdAt  DateTime @default(now())
+
+  @@unique([couponId, userId])
+  @@map("couponredemption")
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inventory StoreInventory[]
+
+  @@map("store")
+}
+
+model StoreInventory {
+  id             String   @id @default(cuid())
+  storeId        String
+  productId      String?
+  customName     String?
+  customCategory String?
+  customPrice    Float?
+  size           String   @default("Default")
+  availableStock Int      @default(0)
+  soldCount      Int      @default(0)
+  remainingStock Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  store   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId, size])
+  @@index([storeId])
+  @@index([productId])
+  @@map("storeinventory")
+}
+
+model ComboProduct {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  mrp         Float?
+  offerPrice  Float
+  image       String   @db.Text
+  stock       Int      @default(0)
+  sizes       Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  variants   ComboVariant[]
+
+  @@map("comboproduct")
+}
+
+model ComboVariant {
+  id             String   @id @default(cuid())
+  comboProductId String
+  colorName      String
+  colorCode      String?
+  images         Json
+  mrp            Float?
+  offerPrice     Float
+  sizes          Json
+  sizeStocks     Json?
+  stock          Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  comboProduct ComboProduct @relation(fields: [comboProductId], references: [id], onDelete: Cascade)
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+
+  @@index([comboProductId])
+  @@map("combovariant")
+}
+
+model Cart {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relations
+  items CartItem[]
+
+  @@map("cart")
+}
+
+model Wishlist {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items WishlistItem[]
+
+  @@map("wishlist")
+}
+
+model WishlistItem {
+  id         String @id @default(cuid())
+  wishlistId String
+  productId  String
+  variantId  String?
+
+  wishlist Wishlist        @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant  ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@unique([wishlistId, productId, variantId])
+  @@index([variantId])
+  @@map("wishlistitem")
+}
+
+model CartItem {
+  id             String  @id @default(cuid())
+  cartId         String
+  productId      String?
+  variantId      String?
+  comboVariantId String?
+  comboProductId String?
+  quantity       Int     @default(1)
+  size           String?
+  colorName      String?
+  image          String? @db.Text
+  price          Float?
+
+  cart         Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product      Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  comboVariant ComboVariant?   @relation(fields: [comboVariantId], references: [id], onDelete: SetNull)
+  comboProduct ComboProduct?   @relation(fields: [comboProductId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([variantId])
+  @@index([comboVariantId])
+  @@unique([cartId, comboProductId, comboVariantId, size])
+  @@map("cartitem")
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  userId            String
+  totalAmount       Float
+  subtotalAmount    Float?
+  discountAmount    Float    @default(0)
+  couponCode        String?
+  status            String   @default("placed") // placed, shipped, delivered, cancelled
+  cancellationReason String?  @db.Text
+  paymentStatus     String   @default("pending") // paid, failed, pending
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  paymentSignature  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relations
+  items OrderItem[]
+
+  @@map("order")
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  productId      String?
+  variantId      String?
+  comboVariantId String?
+  comboProductId String?
+  quantity       Int
+  price          Float // Price at the time of order
+  size           String?
+  colorName      String?
+  image          String? @db.Text
+
+  order        Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  comboVariant ComboVariant?   @relation(fields: [comboVariantId], references: [id], onDelete: SetNull)
+  comboProduct ComboProduct?   @relation(fields: [comboProductId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+  @@index([comboVariantId])
+  @@map("orderitem")
+}
